@@ -1,0 +1,162 @@
+
+
+PHASE 0 — FUNDAMENTAL (WAJIB, JANGAN DILEWATI)
+🎯 Tujuan
+Semua komponen bisa berbicara dengan contract yang sama.
+Yang kamu putuskan di sini:
+- Event format (CDC / non-CDC)
+- Topic naming
+- Ownership data
+
+Output Phase 0
+1 dokumen: Data Contract Spec
+Contoh keputusan:
+Topic: db.{schema}.{table}.changelog
+Key  : primary key
+Value: Debezium-like JSON
+
+📌 Ini fondasi. Salah di sini = refactor besar nanti
+
+PHASE 1 — DATA PLANE (Kafka FIRST)
+Apache Kafka
+🎯 Tujuan
+- Kafka menjadi tulang punggung.
+- Yang kamu buat:
+- Kafka cluster (local via Docker)
+- Topic lifecycle
+- Retention policy
+- DLQ convention
+
+Yang BELUM kamu buat:
+❌ Connector
+❌ Flink
+❌ UI
+
+📌 Kalau Kafka belum stabil, jangan lanjut
+
+PHASE 2 — CONNECTOR RUNTIME (JIWA CONFLUENT)
+🎯 Tujuan
+Bisa menjalankan connector apapun secara konsisten.
+Yang kamu bangun:
+- Connector interface (source & sink)
+- Runtime / worker
+- Offset management
+- Error handling
+- Plugin registry
+
+Yang kamu buat PERTAMA:
+Dummy source (ticker)
+Dummy sink (log)
+📌 Ini bukan Postgres dulu. Ini FRAMEWORK.
+
+PHASE 3 — REAL CONNECTOR (CDC & SINK)
+🎯 Tujuan
+Platform mulai “berguna”.
+Urutan PALING AMAN:
+- HTTP Sink
+- File Sink
+- PostgreSQL CDC Source
+
+Kenapa?
+Sink lebih mudah
+CDC paling kompleks
+
+Output:
+Postgres → Kafka → HTTP
+
+📌 Di sini baru kamu masuk WAL, replication slot, LSN
+
+PHASE 4 — STREAM PROCESSING (Apache Flink)
+Apache Flink
+🎯 Tujuan
+Transformasi data real-time.
+Prinsip KUNCI
+❌ Connector tidak bicara ke Flink
+✅ Kafka adalah contract
+
+Yang kamu bangun:
+- Flink cluster (standalone dulu)
+- Kafka source & sink table
+- SQL execution
+- Job lifecycle (submit / stop)
+
+Output:
+raw topic → Flink → processed topic
+
+PHASE 5 — QUERY LAYER (MIRIP ksqlDB)
+🎯 Tujuan
+User bisa query stream tanpa coding.
+Yang kamu bangun:
+- SQL gateway (REST)
+- Metadata store
+- Validation layer
+
+Contoh API:
+- POST /queries
+  {
+    "sql": "SELECT * FROM orders WHERE status='PAID'"
+  }
+
+Implementasi awal:
+- Flink SQL client
+- REST wrapper
+
+PHASE 6 — CONTROL PLANE (BACKEND)
+🎯 Tujuan
+Semua bisa dikelola dari satu tempat.
+Yang kamu buat:
+- Connector CRUD
+- Flink job manager
+- Topic registry
+- State & config store
+
+Backend stack (recommended):
+- Go (API)
+- PostgreSQL (metadata)
+- gRPC / REST
+
+📌 Ini “otak” platform kamu
+
+PHASE 7 — FRONTEND (UI)
+🎯 Tujuan
+User experience seperti Confluent.
+Hal MINIMUM:
+- Create connector
+- View status
+- View logs
+- Submit SQL
+- View job status
+
+Frontend stack:
+- React / Vue
+- Polling / WebSocket
+
+📌 UI belakangan, jangan di awal
+
+URUTAN YANG BENAR (RINGKAS TEGAS)
+Urutan	Fokus
+1	Data contract
+2	Kafka
+3	Connector runtime
+4	Sink sederhana
+5	Postgres CDC
+6	Flink
+7	Query layer
+8	Control plane
+9	Frontend
+
+Kesalahan Paling Umum (HINDARI)
+❌ Langsung bikin CDC
+❌ Langsung bikin UI
+❌ Campur connector & Flink
+❌ Tidak punya contract data
+❌ Terlalu cepat microservices
+
+Rekomendasi Teknologi (REALISTIS)
+- Komponen	Tech
+- Connector runtime	Rust
+- Control plane	Go
+- Kafka	Native
+- Flink	Native
+- Metadata	PostgreSQL
+- UI	React

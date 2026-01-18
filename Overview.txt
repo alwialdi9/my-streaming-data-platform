@@ -160,3 +160,8 @@ Rekomendasi Teknologi (REALISTIS)
 - Flink	Native
 - Metadata	PostgreSQL
 - UI	React
+
+
+Test WAL secara live (pg_recvlogical)
+2️⃣ Bikin CDC connector skeleton (Go / Rust)
+3️⃣ Tambah Kafka UI (biar enak debug)

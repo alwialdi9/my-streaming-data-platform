@@ -1,4 +1,4 @@
-# Streaming Data Platform (Confluent-like)
+# Streaming Data Platform
 
 ## Overview
 

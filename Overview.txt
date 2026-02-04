@@ -162,6 +162,9 @@ Rekomendasi Teknologi (REALISTIS)
 - UI	React
 
 
-Test WAL secara live (pg_recvlogical)
-2️⃣ Bikin CDC connector skeleton (Go / Rust)
+Test WAL secara live (pg_recvlogical) (DONE)
+2️⃣ Bikin CDC connector skeleton (Go / Rust) (ON PROGRES)
 3️⃣ Tambah Kafka UI (biar enak debug)
+
+kalau mau cdc nya ada value old, replica databasenya diubah jadi FULL
+ALTER TABLE <table> REPLICA IDENTITY FULL;

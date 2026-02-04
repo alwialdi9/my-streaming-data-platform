@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -21,9 +22,14 @@ const (
 func main() {
 	ctx := context.Background()
 
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 	conn, err := pgconn.Connect(ctx,
 		"postgresql://macbookpro:macbookpro@localhost:5432/macbookpro?replication=database",
 	)
+	err = Connect()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,7 +48,7 @@ func main() {
 		sysident.XLogPos,
 		pglogrepl.StartReplicationOptions{
 			PluginArgs: []string{
-				"proto_version '1'",
+				"proto_version '2'",
 				"publication_names '" + publication + "'",
 			},
 		},
@@ -63,10 +69,19 @@ func main() {
 	// clientXLogPos := sysident.XLogPos
 
 	decoder := NewDecoder()
+	brokers := []string{"localhost:9092"}
+	producer := NewProducer(brokers)
+	defer producer.Close()
 
 	for {
 		if time.Now().After(nextStandbyMessageDeadline) {
-			err = pglogrepl.SendStandbyStatusUpdate(context.Background(), conn, pglogrepl.StandbyStatusUpdate{WALWritePosition: clientXLogPos})
+			err = pglogrepl.SendStandbyStatusUpdate(context.Background(), conn,
+				pglogrepl.StandbyStatusUpdate{
+					WALWritePosition: clientXLogPos,
+					WALFlushPosition: clientXLogPos,
+					WALApplyPosition: clientXLogPos,
+					ClientTime:       time.Now(),
+				})
 			if err != nil {
 				log.Fatalln("SendStandbyStatusUpdate failed:", err)
 			}
@@ -74,8 +89,8 @@ func main() {
 			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		rawMsg, err := conn.ReceiveMessage(ctx)
+		ctxTimeOut, cancel := context.WithTimeout(ctx, 10*time.Second)
+		rawMsg, err := conn.ReceiveMessage(ctxTimeOut)
 		cancel()
 
 		if err != nil {
@@ -93,12 +108,12 @@ func main() {
 		}
 
 		switch msg.Data[0] {
-		case pglogrepl.PrimaryKeepaliveMessageByteID:
+		case pglogrepl.PrimaryKeepaliveMessageByteID: // 'k'
 			pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
 			if err != nil {
 				log.Fatalln("ParsePrimaryKeepaliveMessage failed:", err)
 			}
-			log.Println("Primary Keepalive Message =>", "ServerWALEnd:", pkm.ServerWALEnd, "ServerTime:", pkm.ServerTime, "ReplyRequested:", pkm.ReplyRequested)
+			// log.Println("Primary Keepalive Message =>", "ServerWALEnd:", pkm.ServerWALEnd, "ServerTime:", pkm.ServerTime, "ReplyRequested:", pkm.ReplyRequested)
 			if pkm.ServerWALEnd > clientXLogPos {
 				clientXLogPos = pkm.ServerWALEnd
 			}
@@ -106,20 +121,22 @@ func main() {
 				nextStandbyMessageDeadline = time.Time{}
 			}
 
-		case pglogrepl.XLogDataByteID:
+		case pglogrepl.XLogDataByteID: // 'w'
 			xld, err := pglogrepl.ParseXLogData(msg.Data[1:])
 			if err != nil {
 				log.Fatalln("ParseXLogData failed:", err)
 			}
 
-			events := decoder.Decode(xld.WALData, xld.WALStart)
+			events := decoder.Decode(xld.WALData, xld.WALStart, producer, ctxTimeOut)
 			for _, evt := range events {
 				log.Printf("CDC EVENT: %+v\n", evt)
 			}
 
+			// update lsn
 			if xld.WALStart > clientXLogPos {
 				clientXLogPos = xld.WALStart
 			}
+
 		}
 	}
 }
